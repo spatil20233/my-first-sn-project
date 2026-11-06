@@ -1,0 +1,6 @@
+{
+    "scope": "global",
+    "scopeId": "4b5369f0dfe046ad91777f161f26ab03",
+    "name": "asurion-claim-ts",
+    "tsconfigPath": "./src/server/tsconfig.json"
+}

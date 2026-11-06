@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+      "target": "ES2022",
+      "module": "NodeNext",
+      "moduleResolution": "NodeNext",
+      "esModuleInterop": true,
+      "strict": false,
+      "skipLibCheck": true,
+      "ignoreDeprecations": "6.0",
+      "types": ["node"], // for the mock server object
+      "paths": {
+        "@servicenow/sdk/core": ["./node_modules/@servicenow/sdk/core"],
+        "@servicenow/sdk/global": ["./node_modules/@servicenow/sdk/global"]
+      }
+    },
+    "include": [
+      "src/**/*"
+    ]
+  }

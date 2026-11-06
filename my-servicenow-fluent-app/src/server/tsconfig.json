@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "declaration": false,
+    "sourceMap": false,
+    "noEmit": true,
+    "types": ["node"],
+    "paths": {
+      "@servicenow/sdk/core": ["./node_modules/@servicenow/sdk/core"],
+      "@servicenow/sdk/global": ["./node_modules/@servicenow/sdk/global"]
+    }
+  },
+  "include": [
+    "./**/*.ts"
+, "../test-obj.ts"  ]
+}
