@@ -1,4 +1,5 @@
 import { BusinessRule, ClientScript } from '@servicenow/sdk/core'
+import './manager-hierarchy.now'
 
 // // 1. CLIENT SCRIPT: Runs inside the browser when the page loads
 // ClientScript({
@@ -16,7 +17,7 @@ import { BusinessRule, ClientScript } from '@servicenow/sdk/core'
 //     script: script`function onLoad() {
 //         // Correct browser APIs
 //         var currentState = g_form.getValue('state');
-        
+
 //         // Fixed the string quotes syntax error
 //         console.log("Incident form loaded successfully! Current state is: " + currentState);
 //         g_form.addInfoMessage("Table loaded successfully!!");
@@ -37,7 +38,7 @@ import { BusinessRule, ClientScript } from '@servicenow/sdk/core'
 //         if (current.state.changes()) {
 //             const currentState = current.getValue('state');
 //             const previousState = previous.getValue('state');
-            
+
 //             // Correct server API (gs instead of g_form)
 //             gs.addInfoMessage("State updated successfully from " + previousState + " to " + currentState);
 //         }
@@ -73,7 +74,7 @@ export const AlertHighUrgency = ClientScript({
             console.log('Client Script triggered: Urgency changed from ' + oldValue + ' to ' + newValue);
         }
     }`
-});
+})
 /**
  * 2. BUSINESS RULE (Runs on the cloud server)
  * Triggers after an incident record is updated in the database.
@@ -85,7 +86,7 @@ export const LogIncidentWorknotes = BusinessRule({
     active: true,
     when: 'after',
     action: ['update'], // Runs exclusively on record updates
-    order: 100,
+    order: 110,
     addMessage: true,
     message: 'System validated: Your work notes were saved successfully.',
     description: 'Logs a system message on the server when work notes are updated.',
@@ -93,11 +94,11 @@ export const LogIncidentWorknotes = BusinessRule({
     script: script`function onAfter(current, previous) {
         console.log("FLUET LOGS: ", current.state)
     }`
-});
+})
 
 export const ChangeSubCatgoryAutoFill = ClientScript({
     // 🛠️ FIX 1: Change ID from 'br0' to a unique client script key name
-    $id: Now.ID['cs_category_autofill'], 
+    $id: Now.ID['cs_category_autofill'],
     name: 'Sub Category autoFill after Catgeory',
     table: 'incident',
     active: true,
@@ -120,8 +121,88 @@ export const ChangeSubCatgoryAutoFill = ClientScript({
             g_form.showFieldMsg('subcategory', 'Auto-populated to Operating System.', 'info');
         }
     }`
-});
+})
 
 
+// Business Rule: incident, before insert.
+// GlideRecord is a server runtime global. The SDK exports it as a type only.
+export const LinkParentIncident = BusinessRule({
+    $id: Now.ID['br_link_parent_incident'],
+    name: 'Link parent incident',
+    table: 'incident',
+    active: true,
+    when: 'before',
+    action: ['insert'],
+    order: 103,
+    description: 'Sets parent to the newest active incident with the same caller and category.',
+    script: script`(function onBefore(current, previous) {
 
+    gs.info('BR start: caller=' + current.caller_id + ' category="' + current.category + '"');
+    gs.info('BR Current Info: ', current)
+    gs.info('BR Previous Info: ', previous)
 
+    if (!current.caller_id || !current.category) {
+        gs.info('BR skipped: caller or category empty');
+        return;
+    }
+
+    var gr = new GlideRecord('incident');
+    gr.addQuery('caller_id', current.caller_id);
+    gr.addQuery('category', current.category);
+    gr.addQuery('active', true);
+    gr.addQuery('sys_id', '!=', current.sys_id);
+    gr.orderByDesc('sys_created_on');
+    gr.setLimit(1);
+    gr.query();
+
+    gs.info('BR query result: hasNext=' + gr.hasNext() + ' caller=' + current.caller_id + ' category="' + current.category + '"');
+
+    if (gr.next()) {
+        gs.info('BR linking to: ' + gr.number);
+        gs.info('BR linking to parent: ' + gr.getUniqueValue());
+        current.parent = gr.getUniqueValue();
+        current.impact = 1;
+        current.urgency = 1;
+    } else {
+        gs.info('BR no match found');
+    }
+})(current, previous);`,
+})
+
+export const ResolveAllChildIncident = BusinessRule({
+    $id: Now.ID['br_child_incident'],
+    name: 'Resolve All Child incident',
+    table: 'incident',
+    active: true,
+    when: 'after',
+    action: ['update'],
+    order: 104,
+    description: 'Sets all child incidents to be resolved as when parent is resolved',
+    script: script`(function onAfter(current, previous) {
+    gs.info('value: current ' + current.getUniqueValue());
+    // Check whether it has just been changed to Resolved (using your instance's actual value)
+    if (!current.state.changesTo(6)) {
+        gs.info('value: current: not found')
+        return; // If not changed to Resolved, do nothing
+    }
+    var childGR = new GlideRecord('incident');
+    childGR.addQuery('parent', current.getUniqueValue());
+    childGR.addQuery('active', true);            // only active children
+    childGR.query();
+
+    var count = 0;
+    while (childGR.next()) {
+        childGR.state       = 6;                 // Resolved (verify your choice value)
+        childGR.close_code = 'Solved (Permanently)'; // Or other valid choice value for your instance
+        childGR.close_notes = 'Auto-resolved: parent ' + current.number + ' was resolved.';
+        childGR.setWorkflow(false);              // no BR/flow recursion
+        if (childGR.update()) {
+            count++;
+        }
+    }
+
+    if (count > 0) {
+        gs.info('Resolved ' + count + ' child incident(s) of ' + current.number);
+    }
+})(current, previous);`,
+})

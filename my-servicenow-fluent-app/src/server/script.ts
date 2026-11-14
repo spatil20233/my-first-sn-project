@@ -1,6 +1,7 @@
-import { gs, type GlideRecord } from '@servicenow/glide'
+import { GlideRecord, gs } from '@servicenow/glide'
 
- const showStateUpdate=(current: GlideRecord, previous: GlideRecord)=> {
+
+const showStateUpdate = (current: GlideRecord, previous: GlideRecord) => {
     const currentState = current.getValue('state')
     const previousState = previous.getValue('state')
     console.log(`state updated from "${previousState}" to "${currentState}"`)
